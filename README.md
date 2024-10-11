@@ -35,8 +35,6 @@ import numpy as np
 from google.colab import files
 import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.models import Model
 import time
 ```
 
@@ -80,29 +78,47 @@ data_gen = ImageDataGenerator(
     horizontal_flip=True,
     fill_mode='nearest'
 )
+
+train_data = data_gen.flow_from_directory(
+    train_dir,
+    target_size=(150, 150),
+    batch_size=32,
+    class_mode='categorical',
+    subset='training',
+    shuffle=True
+)
+
+val_data = data_gen.flow_from_directory(
+    train_dir,
+    target_size=(150, 150),
+    batch_size=32,
+    class_mode='categorical',
+    subset='validation',
+    shuffle=True
+)
 ```
 
-## 7. Load MobileNetV2 Model
-Model `MobileNetV2` digunakan dengan transfer learning. Layer yang sudah dilatih dibekukan (tidak dilatih ulang) dengan `trainable=False`.
 
-```python
-base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(150, 150, 3))
-base_model.trainable = False
-```
-
-## 8. Build Model
+## 7. Build the model using Sequential
 Layer tambahan ditambahkan di atas `MobileNetV2` untuk klasifikasi gambar menjadi tiga kelas: Rock, Paper, Scissors.
 
 ```python
-x = base_model.output
-x = tf.keras.layers.GlobalAveragePooling2D()(x)
-x = tf.keras.layers.Dense(128, activation='relu')(x)
-predictions = tf.keras.layers.Dense(3, activation='softmax')(x)
-
-model = Model(inputs=base_model.input, outputs=predictions)
+model = tf.keras.Sequential([
+    tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(150, 150, 3)),
+    tf.keras.layers.MaxPooling2D(2, 2),
+    tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPooling2D(2, 2),
+    tf.keras.layers.Conv2D(128, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPooling2D(2, 2),
+    tf.keras.layers.Conv2D(128, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPooling2D(2, 2),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(512, activation='relu'),
+    tf.keras.layers.Dense(3, activation='softmax')  # 3 classes: Rock, Paper, Scissors
+])
 ```
 
-## 9. Compile Model
+# 8. Compile the model
 Model dikompilasi dengan optimizer `Adam`, loss function `categorical_crossentropy`, dan metrik `accuracy`.
 
 ```python
@@ -113,7 +129,7 @@ model.compile(
 )
 ```
 
-## 10. Define Callbacks
+## 9. Define Callbacks
 Callback seperti `EarlyStopping`, `ModelCheckpoint`, dan `ReduceLROnPlateau` digunakan untuk menghentikan pelatihan lebih awal, menyimpan model terbaik, dan mengurangi laju pembelajaran jika diperlukan.
 
 ```python
@@ -124,7 +140,7 @@ early_stopping = EarlyStopping(
 )
 
 model_checkpoint = ModelCheckpoint(
-    'best_model.keras',
+    'best_model.keras', 
     monitor='val_accuracy',
     save_best_only=True,
     mode='max'
@@ -138,7 +154,7 @@ reduce_lr = ReduceLROnPlateau(
 )
 ```
 
-## 11. Train the Model dan Hitung Waktu Pelatihan
+## 10. Train the Model dan Hitung Waktu Pelatihan
 Model dilatih dengan dataset training dan validasi selama 20 epoch, dan waktu pelatihan dicatat menggunakan fungsi `time`. 
 
 ```python
@@ -160,7 +176,7 @@ training_time = end_time - start_time  # Hitung waktu pelatihan
 print(f'Time taken to train the model: {training_time:.2f} seconds')
 ```
 
-## 12. Evaluate Model
+## 11. Evaluate Model
 Setelah pelatihan, model dievaluasi menggunakan dataset validasi untuk mengetahui akurasi model.
 
 ```python
@@ -168,7 +184,7 @@ val_loss, val_accuracy = model.evaluate(val_data)
 print(f'Validation accuracy: {val_accuracy * 100:.2f}%')
 ```
 
-## 13. Prediksi Gambar Baru
+## 12. Prediksi Gambar Baru
 Mengunggah gambar, melakukan preprocessing pada gambar, kemudian memprediksi kelas gambar tersebut (Rock, Paper, atau Scissors) menggunakan model yang sudah dilatih. Hasil prediksi dan confidence ditampilkan.
 
 ```python
